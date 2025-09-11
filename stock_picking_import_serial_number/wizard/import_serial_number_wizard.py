@@ -5,7 +5,15 @@
 import base64
 import io
 
-from openpyxl import load_workbook
+try:
+    from openpyxl import load_workbook
+except ImportError:
+    load_workbook = None
+
+try:
+    import xlrd
+except ImportError:
+    xlrd = None
 
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError
@@ -57,18 +65,31 @@ class StockPickingImportSerialNumber(models.TransientModel):
             )
         if not self.data_file:
             raise UserError(_("You must upload file to import records"))
-        xl_workbook = False
-        xl_sheet = False
-        if self.filename.split(".")[1] in ["xls", "xlsx"]:
-            file_data = base64.b64decode(self.data_file)
+        
+        file_extension = self.filename.split(".")[-1].lower()
+        if file_extension not in ["xls", "xlsx"]:
+            raise UserError(_("Only Excel files (.xls, .xlsx) are supported"))
+        
+        file_data = base64.b64decode(self.data_file)
+        xl_sheet = None
+        
+        if file_extension == "xlsx":
+            if not load_workbook:
+                raise UserError(_("openpyxl library is required for .xlsx files"))
             xl_workbook = load_workbook(io.BytesIO(file_data), read_only=True)
             xl_sheet = xl_workbook.active
-            for picking in self.picking_ids:
-                move_lines = picking.mapped("move_line_ids").filtered(
-                    lambda ln: ln.product_id.tracking == "serial"
-                    and ln.picking_id.picking_type_id.use_create_lots
-                )
-                self._import_serial_number(xl_sheet, move_lines, picking)
+        else:  # .xls
+            if not xlrd:
+                raise UserError(_("xlrd library is required for .xls files"))
+            xl_workbook = xlrd.open_workbook(file_contents=file_data)
+            xl_sheet = xl_workbook.sheet_by_index(0)
+        
+        for picking in self.picking_ids:
+            move_lines = picking.mapped("move_line_ids").filtered(
+                lambda ln: ln.product_id.tracking == "serial"
+                and ln.picking_id.picking_type_id.use_create_lots
+            )
+            self._import_serial_number(xl_sheet, move_lines, picking, file_extension)
         self.data_file = False
 
     def _search_or_create_package(self, picking, name):
@@ -94,28 +115,51 @@ class StockPickingImportSerialNumber(models.TransientModel):
             "quantity": 1.0,
         }
 
-    def _import_serial_number(self, xl_sheet, stock_move_lines, picking):
+    def _import_serial_number(self, xl_sheet, stock_move_lines, picking, file_extension):
         product_file_set = set()
         serial_list = []
-        rows = list(xl_sheet.iter_rows(min_row=2, values_only=True))
-        for row in rows:
-            if not row or len(row) <= self.sn_product_column_index:
-                continue
-            product_value = row[self.sn_product_column_index]
-            serial_value = row[self.sn_serial_column_index] if len(row) > self.sn_serial_column_index else None
-            
-            product = str(product_value) if product_value is not None else ""
-            serial = str(serial_value) if serial_value is not None else ""
-            
-            try:
-                package_value = row[self.sn_package_column_index] if len(row) > self.sn_package_column_index else None
-                package = str(package_value) if package_value is not None else False
-            except IndexError:
+        
+        if file_extension == "xlsx":
+            # openpyxl sheet
+            rows = list(xl_sheet.iter_rows(min_row=2, values_only=True))
+            for row in rows:
+                if not row or len(row) <= self.sn_product_column_index:
+                    continue
+                product_value = row[self.sn_product_column_index]
+                serial_value = row[self.sn_serial_column_index] if len(row) > self.sn_serial_column_index else None
+                
+                product = str(product_value) if product_value is not None else ""
+                serial = str(serial_value) if serial_value is not None else ""
+                
+                try:
+                    package_value = row[self.sn_package_column_index] if len(row) > self.sn_package_column_index else None
+                    package = str(package_value) if package_value is not None else False
+                except IndexError:
+                    package = False
+                
+                if product and serial:
+                    product_file_set.add(product)
+                    serial_list.append((product, serial, package))
+        else:
+            # xlrd sheet (.xls)
+            for row_idx in range(1, xl_sheet.nrows):  # Skip header row
+                if xl_sheet.ncols <= self.sn_product_column_index:
+                    continue
+                
+                product_value = xl_sheet.cell_value(row_idx, self.sn_product_column_index)
+                serial_value = xl_sheet.cell_value(row_idx, self.sn_serial_column_index) if xl_sheet.ncols > self.sn_serial_column_index else None
+                
+                product = str(product_value) if product_value else ""
+                serial = str(serial_value) if serial_value else ""
+                
                 package = False
-            
-            if product and serial:
-                product_file_set.add(product)
-                serial_list.append((product, serial, package))
+                if xl_sheet.ncols > self.sn_package_column_index:
+                    package_value = xl_sheet.cell_value(row_idx, self.sn_package_column_index)
+                    package = str(package_value) if package_value else False
+                
+                if product and serial:
+                    product_file_set.add(product)
+                    serial_list.append((product, serial, package))
 
         products = self.env["product.product"].search(
             [(self.sn_search_product_by_field, "in", list(product_file_set))]

@@ -18,6 +18,6 @@
         "views/stock_picking.xml",
         "security/ir.model.access.csv",
     ],
-    "external_dependencies": {"python": ["openpyxl"]},
+    "external_dependencies": {"python": ["openpyxl", "xlrd"]},
     "maintainers": ["sergio-teruel"],
 }
