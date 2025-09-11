@@ -139,7 +139,7 @@ class TestStockPickingImportSN(CommonStockPickingImportSerial, BaseCommon):
     @mute_logger("odoo.models.unlink")
     def test_import_serial_number_no_show_reserved_01(self):
         # Full import: Lots + packages (SNImport-1.xls)
-        self.picking_in_01.picking_type_id.show_reserved = False
+        self.picking_in_01.picking_type_id.show_reserved_sns = False
         picking = self.picking_in_01.copy()
         picking.action_confirm()
         picking.action_assign()
@@ -165,7 +165,7 @@ class TestStockPickingImportSN(CommonStockPickingImportSerial, BaseCommon):
     @mute_logger("odoo.models.unlink")
     def test_import_serial_number_no_show_reserved_02(self):
         # Full import: Lots + packages (SNImport-2.xls)
-        self.picking_in_01.picking_type_id.show_reserved = False
+        self.picking_in_01.picking_type_id.show_reserved_sns = False
         picking = self.picking_in_01.copy()
         picking.action_confirm()
         picking.action_assign()
@@ -191,7 +191,7 @@ class TestStockPickingImportSN(CommonStockPickingImportSerial, BaseCommon):
     @mute_logger("odoo.models.unlink")
     def test_import_serial_number_no_show_reserved_03(self):
         # Import only lots
-        self.picking_in_01.picking_type_id.show_reserved = False
+        self.picking_in_01.picking_type_id.show_reserved_sns = False
         picking = self.picking_in_01.copy()
         picking.action_confirm()
         picking.action_assign()
