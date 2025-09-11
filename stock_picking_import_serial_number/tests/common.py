@@ -34,7 +34,7 @@ class CommonStockPickingImportSerial:
         name = f"{tracking}"
         vals = {
             "name": name,
-            "type": "product",
+            "type": "consu",
             "tracking": tracking,
         }
         if reference:
