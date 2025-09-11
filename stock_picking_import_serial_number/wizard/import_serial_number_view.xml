@@ -13,9 +13,7 @@
                             placeholder="Choose a file to import..."
                         />
                         <field name="overwrite_serial" />
-                        <field name="filename" invisible="1" />
                     </group>
-                    <field name="picking_ids" invisible="1" />
                 </sheet>
                 <footer>
                     <button
@@ -29,6 +27,7 @@
             </form>
         </field>
     </record>
+
     <record id="action_import_serial_number" model="ir.actions.act_window">
         <field name="name">Import S/N</field>
         <field name="type">ir.actions.act_window</field>

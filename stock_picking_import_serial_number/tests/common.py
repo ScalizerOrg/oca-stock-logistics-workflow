@@ -21,7 +21,7 @@ class CommonStockPickingImportSerial:
         cls.warehouse = cls.env.ref("stock.warehouse0")
         cls.picking_type_in = cls.env.ref("stock.picking_type_in")
         cls.picking_type_in.use_create_lots = True
-        cls.picking_type_in.show_reserved = True
+        cls.picking_type_in.show_reserved_sns = True
         cls.supplier_location = cls.env.ref("stock.stock_location_suppliers")
         cls.supplier = cls.env["res.partner"].create({"name": "Supplier - test"})
 
