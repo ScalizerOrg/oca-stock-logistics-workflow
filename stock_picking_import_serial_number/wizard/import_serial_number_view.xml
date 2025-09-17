@@ -13,6 +13,7 @@
                             placeholder="Choose a file to import..."
                         />
                         <field name="overwrite_serial" />
+                        <field name="filename" invisible="1" /><!-->Invisible for widget-->
                     </group>
                 </sheet>
                 <footer>
