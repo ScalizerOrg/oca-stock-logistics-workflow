@@ -163,36 +163,27 @@ class StockPickingImportSerialNumber(models.TransientModel):
                     product_file_set.add(product)
                     serial_list.append((product, serial, package))
 
-        products = self.env["product.product"].search(
-            [(self.sn_search_product_by_field, "in", list(product_file_set))]
-        )
+        product_keys = list({item[0] for item in serial_list})
+        products = self.env["product.product"].search([(self.sn_search_product_by_field, "in", product_keys)])
+
+        # -----------------------------
+        # Overwrite mode: delete existing lines
+        # -----------------------------
+        if self.overwrite_serial:
+            stock_move_lines.exists().unlink()
+
+        # -----------------------------
+        # Create new stock move lines
+        # -----------------------------
         for item in serial_list:
-            product_key = item[0]
-            product = products.filtered(
-                lambda p, key=product_key: p[self.sn_search_product_by_field] == key
-            )
-            if picking.picking_type_id.show_reserved_sns:
-                product_match = product
-                smls = stock_move_lines.filtered(
-                    lambda ln, p=product_match: ln.product_id == p
-                )
-                for sml in smls:
-                    if not sml.lot_name or self.overwrite_serial:
-                        sml.lot_name = item[1]
-                        sml.quantity = 1.0
-                        if item[2]:
-                            sml.result_package_id = self._search_or_create_package(
-                                picking, item[2]
-                            )
-                        # Only assign one serial
-                        break
-            # TODO: Check if product is present on initial demand??
-            # elif product and picking.move_lines.filtered
-            # (lambda ln: ln.product_id == product)
-            elif product:
-                vals = self._prepare_stock_move_line_vals(picking, product)
-                vals.update(lot_name=item[1])
-                if item[2]:
-                    package = self._search_or_create_package(picking, item[2])
-                    vals.update(result_package_id=package.id)
-                self.env["stock.move.line"].create(vals)
+            product_key, serial, package = item
+            product = products.filtered(lambda p, key=product_key: p[self.sn_search_product_by_field] == key)
+            if not product:
+                continue
+
+            vals = self._prepare_stock_move_line_vals(picking, product)
+            vals.update(lot_name=serial, quantity=1.0)
+            if package:
+                pkg = self._search_or_create_package(picking, package)
+                vals.update(result_package_id=pkg.id)
+            self.env["stock.move.line"].create(vals)
